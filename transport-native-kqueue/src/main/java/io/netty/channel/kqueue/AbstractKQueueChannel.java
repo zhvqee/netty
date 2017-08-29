@@ -137,9 +137,27 @@ abstract class AbstractKQueueChannel extends AbstractChannel implements UnixChan
         try {
             if (isRegistered()) {
                 // The FD will be closed, which should take care of deleting any associated events from kqueue, but
-                // since we rely upon jniSelfRef to be consistent we make sure that we clear this reference out for all]
-                // events which are pending in kqueue to avoid referencing a deleted pointer at a later time.
-                doDeregister();
+                // since we rely upon jniSelfRef to be consistent we make sure that we clear this reference out for
+                // all events which are pending in kqueue to avoid referencing a deleted pointer at a later time.
+
+                // Need to check if we are on the EventLoop as doClose() may be triggered by the GlobalEventExecutor
+                // if SO_LINGER is used.
+                //
+                // See https://github.com/netty/netty/issues/7159
+                if (eventLoop().inEventLoop()) {
+                    doDeregister();
+                } else {
+                    eventLoop().execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                doDeregister();
+                            } catch (Exception ignore) {
+                                // Just ignore
+                            }
+                        }
+                    });
+                }
             }
         } finally {
             socket.close();

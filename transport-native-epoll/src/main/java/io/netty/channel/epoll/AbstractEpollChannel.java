@@ -171,7 +171,24 @@ abstract class AbstractEpollChannel extends AbstractChannel implements UnixChann
             }
 
             if (isRegistered()) {
-                doDeregister();
+                // Need to check if we are on the EventLoop as doClose() may be triggered by the GlobalEventExecutor
+                // if SO_LINGER is used.
+                //
+                // See https://github.com/netty/netty/issues/7159
+                if (eventLoop().inEventLoop()) {
+                    doDeregister();
+                } else {
+                    eventLoop().execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                doDeregister();
+                            } catch (Exception ignore) {
+                                // Just ignore
+                            }
+                        }
+                    });
+                }
             }
         } finally {
             socket.close();
