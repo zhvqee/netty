@@ -182,9 +182,8 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
 
     @UnstableApi
     @Override
-    protected void doShutdownOutput(Throwable cause) throws Exception {
-        super.doShutdownOutput(cause);
-        close();
+    protected void doShutdownOutput() throws Exception {
+        doClose();
     }
 
     /**
