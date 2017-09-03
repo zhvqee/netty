@@ -175,10 +175,11 @@ abstract class AbstractEpollChannel extends AbstractChannel implements UnixChann
                 // if SO_LINGER is used.
                 //
                 // See https://github.com/netty/netty/issues/7159
-                if (eventLoop().inEventLoop()) {
+                EventLoop loop = eventLoop();
+                if (loop.inEventLoop()) {
                     doDeregister();
                 } else {
-                    eventLoop().execute(new Runnable() {
+                    loop.execute(new Runnable() {
                         @Override
                         public void run() {
                             try {

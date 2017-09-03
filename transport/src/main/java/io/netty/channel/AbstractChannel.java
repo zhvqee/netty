@@ -638,11 +638,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
             this.outboundBuffer = null; // Disallow adding any messages and flushes to outboundBuffer.
 
-            if (cause == null) {
-                cause = new ChannelOutputShutdownException("Channel output shutdown", cause);
-            }
-            final Throwable finalCause = cause;
-
+            final Throwable shutdownCause = cause == null ?
+                    new ChannelOutputShutdownException("Channel output shutdown") :
+                    new ChannelOutputShutdownException("Channel output shutdown", cause);
             Executor closeExecutor = prepareToClose();
             if (closeExecutor != null) {
                 closeExecutor.execute(new Runnable() {
@@ -655,13 +653,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         } catch (Throwable err) {
                             promise.setFailure(err);
                         } finally {
-                            // Call invokeLater so closeAndDeregister is executed in the EventLoop again!
-                            invokeLater(new Runnable() {
+                            // Dispatch to the EventLoop
+                            eventLoop().execute(new Runnable() {
                                 @Override
                                 public void run() {
-                                    outboundBuffer.failFlushed(finalCause, false);
-                                    outboundBuffer.close(finalCause, true);
-                                    pipeline.fireUserEventTriggered(ChannelOutputShutdownEvent.INSTANCE);
+                                    closeOutboundBufferForShutdown(pipeline, outboundBuffer, shutdownCause);
                                 }
                             });
                         }
@@ -675,11 +671,16 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 } catch (Throwable err) {
                     promise.setFailure(err);
                 } finally {
-                    outboundBuffer.failFlushed(finalCause, false);
-                    outboundBuffer.close(finalCause, true);
-                    pipeline.fireUserEventTriggered(ChannelOutputShutdownEvent.INSTANCE);
+                    closeOutboundBufferForShutdown(pipeline, outboundBuffer, shutdownCause);
                 }
             }
+        }
+
+        private void closeOutboundBufferForShutdown(
+                ChannelPipeline pipeline, ChannelOutboundBuffer buffer, Throwable cause) {
+            buffer.failFlushed(cause, false);
+            buffer.close(cause, true);
+            pipeline.fireUserEventTriggered(ChannelOutputShutdownEvent.INSTANCE);
         }
 
         private void close(final ChannelPromise promise, final Throwable cause,
