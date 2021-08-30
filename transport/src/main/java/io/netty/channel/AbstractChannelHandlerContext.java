@@ -931,6 +931,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         return false;
     }
 
+    //查找下一个context
     private AbstractChannelHandlerContext findContextInbound() {
         AbstractChannelHandlerContext ctx = this;
         do {

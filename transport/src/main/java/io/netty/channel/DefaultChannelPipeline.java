@@ -205,8 +205,10 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
         final AbstractChannelHandlerContext newCtx;
         synchronized (this) {
+            // 检测Shareable
             checkMultiplicity(handler);
 
+            //创建一个上下文，每添加一个handler 就创建一个上下文
             newCtx = newContext(group, filterName(name, handler), handler);
 
             addLast0(newCtx);
@@ -221,6 +223,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
             }
 
             EventExecutor executor = newCtx.executor();
+            //如果不是在eventloop线上，异步执行
             if (!executor.inEventLoop()) {
                 newCtx.setAddPending();
                 executor.execute(new Runnable() {
@@ -236,6 +239,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return this;
     }
 
+    //添加到尾部
     private void addLast0(AbstractChannelHandlerContext newCtx) {
         AbstractChannelHandlerContext prev = tail.prev;
         newCtx.prev = prev;

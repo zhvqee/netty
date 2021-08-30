@@ -70,6 +70,8 @@ import java.util.List;
 public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter {
 
     /**
+     *
+     *  黑蝙蝠
      * Cumulate {@link ByteBuf}s by merge them into one {@link ByteBuf}'s, using memory copies.
      */
     public static final Cumulator MERGE_CUMULATOR = new Cumulator() {
@@ -250,9 +252,18 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      */
     protected void handlerRemoved0(ChannelHandlerContext ctx) throws Exception { }
 
+
+    /**
+     * 读取 消息
+     * @param ctx
+     * @param msg
+     * @throws Exception
+     */
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (msg instanceof ByteBuf) {
+        if (msg instanceof ByteBuf) { //是ByteBuf
+
+            //得到一个List<>
             CodecOutputList out = CodecOutputList.newInstance();
             try {
                 ByteBuf data = (ByteBuf) msg;
@@ -260,6 +271,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                 if (first) {
                     cumulation = data;
                 } else {
+                    //上一次数据和这一次数据要进行合并，cumulation 容量不足时需要扩容
                     cumulation = cumulator.cumulate(ctx.alloc(), cumulation, data);
                 }
                 callDecode(ctx, cumulation, out);
@@ -268,10 +280,12 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
             } catch (Throwable t) {
                 throw new DecoderException(t);
             } finally {
+                //如果目前不可读，
                 if (cumulation != null && !cumulation.isReadable()) {
                     numReads = 0;
                     cumulation.release();
                     cumulation = null;
+                    //读取到多少字节后，丢弃
                 } else if (++ numReads >= discardAfterReads) {
                     // We did enough reads already try to discard some bytes so we not risk to see a OOME.
                     // See https://github.com/netty/netty/issues/4275
@@ -281,10 +295,13 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
                 int size = out.size();
                 decodeWasNull = !out.insertSinceRecycled();
+                //循环触发，解码结果
                 fireChannelRead(ctx, out, size);
+                //回收
                 out.recycle();
             }
         } else {
+            //如果不是ByteBuf  处理下一个channelhandler
             ctx.fireChannelRead(msg);
         }
     }
@@ -404,12 +421,14 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      * @param in            the {@link ByteBuf} from which to read data
      * @param out           the {@link List} to which decoded messages should be added
      */
+
+    // 解码
     protected void callDecode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         try {
-            while (in.isReadable()) {
+            while (in.isReadable()) { //数据可读
                 int outSize = out.size();
 
-                if (outSize > 0) {
+                if (outSize > 0) { //是否有out有数据，有先调用下一个channelHandler
                     fireChannelRead(ctx, out, outSize);
                     out.clear();
 
@@ -436,6 +455,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                 }
 
                 if (outSize == out.size()) {
+                    //解析后，结果大小无变化，如果老的长度和可读取长度一样，说明数据不够
                     if (oldInputLength == in.readableBytes()) {
                         break;
                     } else {
@@ -448,7 +468,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                             StringUtil.simpleClassName(getClass()) +
                                     ".decode() did not read anything but decoded a message.");
                 }
-
+                //每次只执行一次
                 if (isSingleDecode()) {
                     break;
                 }
@@ -482,11 +502,12 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      * @param out           the {@link List} to which decoded messages should be added
      * @throws Exception    is thrown if an error occurs
      */
+
     final void decodeRemovalReentryProtection(ChannelHandlerContext ctx, ByteBuf in, List<Object> out)
             throws Exception {
-        decodeState = STATE_CALLING_CHILD_DECODE;
+        decodeState = STATE_CALLING_CHILD_DECODE; //设置解码状态为，调用子类解码
         try {
-            decode(ctx, in, out);
+            decode(ctx, in, out); //子类解码
         } finally {
             boolean removePending = decodeState == STATE_HANDLER_REMOVED_PENDING;
             decodeState = STATE_INIT;

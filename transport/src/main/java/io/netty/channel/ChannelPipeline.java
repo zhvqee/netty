@@ -29,6 +29,7 @@ import java.util.NoSuchElementException;
 
 
 /**
+ *  一组ChannelHandler 用来处理或者拦截输入事件或者 输出操作
  * A list of {@link ChannelHandler}s which handles or intercepts inbound events and outbound operations of a
  * {@link Channel}.  {@link ChannelPipeline} implements an advanced form of the
  * <a href="http://www.oracle.com/technetwork/java/interceptingfilter-142169.html">Intercepting Filter</a> pattern
@@ -36,11 +37,17 @@ import java.util.NoSuchElementException;
  * interact with each other.
  *
  * <h3>Creation of a pipeline</h3>
- *
+ * 每个channel 有自己的管道 并且自动创建
  * Each channel has its own pipeline and it is created automatically when a new channel is created.
  *
+ *
+ * 事件流转
  * <h3>How an event flows in a pipeline</h3>
  *
+ *  下图展示了 事件在ChannelPipeline 下被ChannelHandler 如何被处理
+ *  事件被处理要么通过ChannelInboundHandler 要么ChannelOutboundHandler
+ *
+ *  并且传递给最近的一个handler 通过ChannelHandlerContext 类下的事件传播方法，例如fireChannelRead，write
  * The following diagram describes how I/O events are processed by {@link ChannelHandler}s in a {@link ChannelPipeline}
  * typically. An I/O event is handled by either a {@link ChannelInboundHandler} or a {@link ChannelOutboundHandler}
  * and be forwarded to its closest handler by calling the event propagation methods defined in
@@ -198,6 +205,10 @@ import java.util.NoSuchElementException;
  *
  * pipeline.addLast("decoder", new MyProtocolDecoder());
  * pipeline.addLast("encoder", new MyProtocolEncoder());
+ *
+ *
+ 告诉管道在不同于I/O线程的线程中运行MyBusinessLogicHandler的事件处理程序方法，这样I/O线程就不会被耗时的任务阻塞。
+ * //如果您的业务逻辑是完全异步的或完成得非常快，则不需要指定组。
  *
  * // Tell the pipeline to run MyBusinessLogicHandler's event handler methods
  * // in a different thread than an I/O thread so that the I/O thread is not blocked by

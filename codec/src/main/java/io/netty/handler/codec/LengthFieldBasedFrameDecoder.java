@@ -23,8 +23,13 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 
 /**
+ * 通过动态的 length 属性解析
  * A decoder that splits the received {@link ByteBuf}s dynamically by the
- * value of the length field in the message.  It is particularly useful when you
+ * value of the length field in the message.
+ *
+ *
+ * 典型用于二进制消息，有个整形的头部field,代表消息bOdy的长度或者整个消息长度
+ *It is particularly useful when you
  * decode a binary message which has an integer header field that represents the
  * length of the message body or the whole message.
  * <p>
@@ -33,6 +38,8 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
  * proprietary client-server protocols. Here are some example that will give
  * you the basic idea on which option does what.
  *
+ *
+ *  2字节长度，offset=0, 不跳过头部
  * <h3>2 bytes length field at offset 0, do not strip header</h3>
  *
  * The value of the length field in this example is <tt>12 (0x0C)</tt> which
@@ -53,6 +60,7 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
  * +--------+----------------+      +--------+----------------+
  * </pre>
  *
+ *  2字节长度，offset=0 ,跳过头部
  * <h3>2 bytes length field at offset 0, strip header</h3>
  *
  * Because we can get the length of the content by calling
@@ -73,14 +81,20 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
  * +--------+----------------+      +----------------+
  * </pre>
  *
+ *
+ *  2字节，offset=0,不跳过头部 ，并且length field代表整个消息长度
  * <h3>2 bytes length field at offset 0, do not strip header, the length field
  *     represents the length of the whole message</h3>
  *
  * In most cases, the length field represents the length of the message body
  * only, as shown in the previous examples.  However, in some protocols, the
  * length field represents the length of the whole message, including the
- * message header.  In such a case, we specify a non-zero
- * <tt>lengthAdjustment</tt>.  Because the length value in this example message
+ * message header.
+ *
+ *
+ *  这里length 代表整个消息的长度，那么我们body的大小需要扣除length 所占用的，指定-2
+ * In such a case, we specify a non-zero <tt>lengthAdjustment</tt>.
+ * Because the length value in this example message
  * is always greater than the body length by <tt>2</tt>, we specify <tt>-2</tt>
  * as <tt>lengthAdjustment</tt> for compensation.
  * <pre>
@@ -96,6 +110,8 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
  * +--------+----------------+      +--------+----------------+
  * </pre>
  *
+ *
+ *  又比如，3字节长度，5字节头部，不跳过头部
  * <h3>3 bytes length field at the end of 5 bytes header, do not strip header</h3>
  *
  * The following message is a simple variation of the first example.  An extra
@@ -181,15 +197,17 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
  * </pre>
  * @see LengthFieldPrepender
  */
+
+//基于长度的解码器
 public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
 
-    private final ByteOrder byteOrder;
-    private final int maxFrameLength;
-    private final int lengthFieldOffset;
-    private final int lengthFieldLength;
-    private final int lengthFieldEndOffset;
-    private final int lengthAdjustment;
-    private final int initialBytesToStrip;
+    private final ByteOrder byteOrder; //字节序
+    private final int maxFrameLength; //最大帧数
+    private final int lengthFieldOffset; //长度属性的起始偏移位置
+    private final int lengthFieldLength;//长度属性的占用字节数，即从lengthFieldOffset开始读取lengthFieldLength字节，为消息的长度
+    private final int lengthFieldEndOffset; //lengthFieldOffset+lengthFieldLength
+    private final int lengthAdjustment; //调整开始读取
+    private final int initialBytesToStrip;//跳过字节数
     private final boolean failFast;
     private boolean discardingTooLongFrame;
     private long tooLongFrameLength;
@@ -404,22 +422,36 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
      * @return  frame           the {@link ByteBuf} which represent the frame or {@code null} if no frame could
      *                          be created.
      */
+
+    /**
+     *
+     * 解码
+     * @param ctx
+     * @param in
+     * @return
+     * @throws Exception
+     */
     protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         if (discardingTooLongFrame) {
             discardingTooLongFrame(in);
         }
 
+        //如果可读字节小于，长度属性值
         if (in.readableBytes() < lengthFieldEndOffset) {
             return null;
         }
 
+        //得到实际length offset
         int actualLengthFieldOffset = in.readerIndex() + lengthFieldOffset;
+
+        //得到length field 的内容值
         long frameLength = getUnadjustedFrameLength(in, actualLengthFieldOffset, lengthFieldLength, byteOrder);
 
         if (frameLength < 0) {
             failOnNegativeLengthField(in, frameLength, lengthFieldEndOffset);
         }
 
+        // 加上调整值和
         frameLength += lengthAdjustment + lengthFieldEndOffset;
 
         if (frameLength < lengthFieldEndOffset) {
@@ -433,13 +465,14 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
 
         // never overflows because it's less than maxFrameLength
         int frameLengthInt = (int) frameLength;
-        if (in.readableBytes() < frameLengthInt) {
+        if (in.readableBytes() < frameLengthInt) { //如果可读小于帧长，解析失败
             return null;
         }
 
         if (initialBytesToStrip > frameLengthInt) {
             failOnFrameLengthLessThanInitialBytesToStrip(in, frameLength, initialBytesToStrip);
         }
+        // 跳过
         in.skipBytes(initialBytesToStrip);
 
         // extract frame

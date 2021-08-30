@@ -21,6 +21,7 @@ import io.netty.channel.ChannelHandlerContext;
 import java.util.List;
 
 /**
+ *  固定长度解码器
  * A decoder that splits the received {@link ByteBuf}s by the fixed number
  * of bytes. For example, if you received the following four fragmented packets:
  * <pre>
@@ -38,6 +39,9 @@ import java.util.List;
  */
 public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
 
+    /**
+     * 固定长度
+     */
     private final int frameLength;
 
     /**
@@ -55,7 +59,7 @@ public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
 
     @Override
     protected final void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-        Object decoded = decode(ctx, in);
+        Object decoded = decode(ctx, in); //解码
         if (decoded != null) {
             out.add(decoded);
         }
