@@ -43,6 +43,11 @@ public final class DefaultEventExecutorChooserFactory implements EventExecutorCh
         return (val & -val) == val;
     }
 
+    /**
+     *
+     * PowerOfTwoEventExecutorChooser 和 GenericEventExecutorChooser 都是轮训
+     * 但是2次幂 对CPU cache 有好处，并且& 运行效率更高，所以优化到了极致
+     */
     private static final class PowerOfTwoEventExecutorChooser implements EventExecutorChooser {
         private final AtomicInteger idx = new AtomicInteger();
         private final EventExecutor[] executors;

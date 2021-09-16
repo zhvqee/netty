@@ -18,6 +18,10 @@ package io.netty.channel;
 import io.netty.util.IntSupplier;
 
 /**
+ *
+ * 提供一种能力，来控制select loop的行为
+ *
+ * 如果有需要立即处理的事件，则阻塞选择操作可能被延迟或完全跳过。
  * Select strategy interface.
  *
  * Provides the ability to control the behavior of the select loop. For example a blocking select

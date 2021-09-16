@@ -31,7 +31,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 public abstract class MultithreadEventExecutorGroup extends AbstractEventExecutorGroup {
 
     private final EventExecutor[] children;
-    private final Set<EventExecutor> readonlyChildren;
+    private final Set<EventExecutor> readonlyChildren;  //children 的副本，不可更改
+
+
+
     private final AtomicInteger terminatedChildren = new AtomicInteger();
     private final Promise<?> terminationFuture = new DefaultPromise(GlobalEventExecutor.INSTANCE);
     private final EventExecutorChooserFactory.EventExecutorChooser chooser;
@@ -71,16 +74,24 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
         if (nThreads <= 0) {
             throw new IllegalArgumentException(String.format("nThreads: %d (expected: > 0)", nThreads));
         }
-
+        //如果executor 为NULL，则每个任务就创建一个线程来执行
         if (executor == null) {
+            //threadFactory 是
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
+        /**
+         * 初始化，event线程数组
+         */
         children = new EventExecutor[nThreads];
 
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
+                /**
+                 * 由子类具体来创建具体的线程 ,这里控制有nThreads,线程，N个线程的创建是通过ThreadPerTaskExecutor
+                 * 这个执行器执行的，没来一个任务就创建一个线程
+                 */
                 children[i] = newChild(executor, args);
                 success = true;
             } catch (Exception e) {
@@ -108,6 +119,9 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         }
 
+        /**
+         * 事件选择器
+         */
         chooser = chooserFactory.newChooser(children);
 
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
