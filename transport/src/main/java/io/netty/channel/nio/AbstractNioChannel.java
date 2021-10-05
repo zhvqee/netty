@@ -54,8 +54,21 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     private static final ClosedChannelException DO_CLOSE_CLOSED_CHANNEL_EXCEPTION = ThrowableUtil.unknownStackTrace(
             new ClosedChannelException(), AbstractNioChannel.class, "doClose()");
 
+    /**
+     * 正在的 可注册的底层Channel ，
+     *
+     */
     private final SelectableChannel ch;
+
+
+    /**
+     * 感兴趣的事件
+     */
     protected final int readInterestOp;
+
+    /**
+     * 注册返回的select key
+     */
     volatile SelectionKey selectionKey;
     boolean readPending;
     private final Runnable clearReadPendingRunnable = new Runnable() {
@@ -379,6 +392,12 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         return loop instanceof NioEventLoop;
     }
 
+
+    /**
+     *
+     * 注册
+     * @throws Exception
+     */
     @Override
     protected void doRegister() throws Exception {
         boolean selected = false;

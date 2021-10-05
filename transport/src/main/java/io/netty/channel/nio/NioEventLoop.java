@@ -746,28 +746,46 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         Selector selector = this.selector;
         try {
             int selectCnt = 0;
+            // 获取当前系统时间
             long currentTimeNanos = System.nanoTime();
+
+            // select 延迟到期唤醒时间，
             long selectDeadLineNanos = currentTimeNanos + delayNanos(currentTimeNanos);
             for (; ; ) {
+                // 超时的毫秒数
                 long timeoutMillis = (selectDeadLineNanos - currentTimeNanos + 500000L) / 1000000L;
-                if (timeoutMillis <= 0) {
-                    if (selectCnt == 0) {
-                        selector.selectNow();
+                if (timeoutMillis <= 0) { //这里说明需要执行定时任务
+                    if (selectCnt == 0) { //如果之前未轮询
+                        selector.selectNow(); //直接调用selectNow()，再次看看是否有事件，并且会立即返回
                         selectCnt = 1;
                     }
-                    break;
+                    break; // 跳出循环执行，io
                 }
 
                 // If a task was submitted when wakenUp value was true, the task didn't get a chance to call
                 // Selector#wakeup. So we need to check task queue again before executing select operation.
                 // If we don't, the task might be pended until select operation was timed out.
                 // It might be pended until idle timeout if IdleStateHandler existed in pipeline.
+
+                /**
+                 *
+                 * 1、当队列有任务 &&   唤醒的标志 为false  则直接调用selectNow，否则任务得不到及时处理，可能需要阻塞超时返回
+                 */
                 if (hasTasks() && wakenUp.compareAndSet(false, true)) {
                     selector.selectNow();
                     selectCnt = 1;
-                    break;
+                    break;  // 跳出循环执行，io
                 }
 
+                /**
+                 *   这里返回有几种：
+                 *
+                 *   1、检测到 就绪的IO
+                 *   2、阻塞超时timeoutMillis，返回
+                 *   3、空轮询，
+                 *   4、被其他线程唤醒
+                 *
+                 */
                 int selectedKeys = selector.select(timeoutMillis);
                 selectCnt++;
 
